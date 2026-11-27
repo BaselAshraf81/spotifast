@@ -188,6 +188,18 @@ pub fn uri_kind(uri: &str) -> Option<&str> {
     parts.next()
 }
 
+/// The playback context of a user's Liked Songs. Spotify takes the user id
+/// percent-encoded, so a name with a non-ASCII character (`zoé`) must go
+/// as `zo%C3%A9`; the raw form answers `Invalid context uri`.
+pub fn liked_songs_uri(user_id: &str) -> String {
+    const USER_ID: &percent_encoding::AsciiSet = &percent_encoding::NON_ALPHANUMERIC
+        .remove(b'-')
+        .remove(b'_')
+        .remove(b'.');
+    let id = percent_encoding::utf8_percent_encode(user_id, USER_ID);
+    format!("spotify:user:{id}:collection")
+}
+
 /// Spotify's radio station seeded by a song, playlist, album, or artist.
 pub fn station_uri(seed: &str) -> Option<String> {
     let kind = uri_kind(seed)?;
@@ -698,5 +710,19 @@ mod tests {
             html_links(spoofed).1,
             [(0..1, "spotify:playlist:pl1".to_string())]
         );
+    }
+
+    #[test]
+    fn liked_songs_uri_encodes_the_user_id_like_spotify_expects() {
+        assert_eq!(liked_songs_uri("demo"), "spotify:user:demo:collection");
+        assert_eq!(
+            liked_songs_uri("zoé"),
+            "spotify:user:zo%C3%A9:collection"
+        );
+        assert_eq!(
+            liked_songs_uri("a-b_c.d"),
+            "spotify:user:a-b_c.d:collection"
+        );
+        assert_eq!(uri_id(&liked_songs_uri("zoé")), Some("collection"));
     }
 }
